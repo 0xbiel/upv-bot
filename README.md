@@ -21,8 +21,8 @@ README.md
 ## Instalación
 1. Clona el repositorio:
     ```sh
-    git clone <URL_DEL_REPOSITORIO>
-    cd <NOMBRE_DEL_REPOSITORIO>
+    git clone https://github.com/0xbiel/upv-bot.git
+    cd upv_bot
     ```
 
 2. Crea un entorno virtual y activa:
