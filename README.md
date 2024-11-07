@@ -49,6 +49,7 @@ README.md
     - `l` : Mostrar lista de la actividad
     - `b` : Fuerza bruta hasta conseguir la actividad
     - `r` : Reservar simple
+    - `c` : Seleccionar URL/Actividad de manera Interactiva
     - `u` : Cambiar URL
     - `e` : Salir
 

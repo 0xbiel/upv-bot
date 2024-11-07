@@ -13,7 +13,7 @@ import threading
 s = requests.session()
 
 def hw():
-        print(r"""
+    print(r"""
    __  ______ _    __   ____        __ 
   / / / / __ \ |  / /  / __ )____  / /_
  / / / / /_/ / | / /  / __  / __ \/ __/
@@ -22,13 +22,20 @@ def hw():
                                        
 Modified by @0xbiel
     """)
-# 1. DEFAULT DATA
+
+# Patterns
 pattern = '(?i)(?<=<td>)(.*)(?=<br>Solo)'
 valid_pattern = '(?i)(?<=celista">)(.*)(?=<br>Solo)'
 
 # Temp URL
+global campus
+campus = "V"
+global tipoact
+tipoact = "6801"
+global codacti
+codacti = "21570"
 global url
-url = "https://intranet.upv.es/pls/soalu/sic_depact.HSemActividades?p_campus=A&p_tipoact=6821&p_codacti=21676&p_vista=intranet&p_idioma=c&p_solo_matricula_sn=&p_anc=filtro_actividad"
+url = f"https://intranet.upv.es/pls/soalu/sic_depact.HSemActividades?p_campus={campus}&p_tipoact={tipoact}&p_codacti={codacti}&p_vista=intranet&p_idioma=c&p_solo_matricula_sn=&p_anc=filtro_actividad"
 headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:106.0) Gecko/20100101 Firefox/106.0", 
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -46,6 +53,9 @@ headers = {
 }
 days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
+############################################
+####               Utils                ####
+############################################
 def login(user, passwd):
     login_url = "https://intranet.upv.es:443/pls/soalu/est_aute.intraalucomp"
     login_data = {"id": "c", "estilo": "500", "vista": '', "param": '', "cua": "miupv", "dni": user, "clau": passwd}
@@ -97,27 +107,52 @@ def get_time(schedule):
         })
     return items
 
+def get_day_order(day):
+    # Dictionary mapping days in different languages to standard order (0-6)
+    day_mappings = {
+        # Spanish
+        'lunes': 0, 'martes': 1, 'miércoles': 2, 'miercoles': 2, 
+        'jueves': 3, 'viernes': 4, 'sábado': 5, 'sabado': 5, 'domingo': 6,
+        # Catalan
+        'dilluns': 0, 'dimarts': 1, 'dimecres': 2, 
+        'dijous': 3, 'divendres': 4, 'dissabte': 5, 'diumenge': 6,
+        # English
+        'monday': 0, 'tuesday': 1, 'wednesday': 2,
+        'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6
+    }
+    return day_mappings.get(day.lower(), 7)  # Unknown days go to the end
+
 def print_schedule(items):
     if not items:
         print("No schedule available.")
         return
 
-    # Define header and rows
-    header = ['Day', 'Time', 'Code']
-    rows = [[item['day'], item['time'], item['code']] for item in items]
-    
-    # Calculate column widths
-    col_widths = [max(len(str(row[i])) for row in rows + [header]) for i in range(len(header))]
-    
-    # Print formatted table
-    header_formatted = ' | '.join(f"{header[i].ljust(col_widths[i])}" for i in range(len(header)))
-    separator = '-+-'.join('-' * col_widths[i] for i in range(len(header)))
-    print(header_formatted)
-    print(separator)
-    for row in rows:
-        print(' | '.join(f"{str(row[i]).ljust(col_widths[i])}" for i in range(len(row))))
+    # Extract unique days and times, sort days by standard order
+    days = sorted(set(item['day'] for item in items), key=get_day_order)
+    times = sorted(set(item['time'] for item in items))
 
-# Python
+    # Rest of the function remains the same
+    schedule_map = {(item['day'], item['time']): item['code'] for item in items}
+    
+    day_width = max(len(day) for day in days)
+    time_width = max(len(time) for time in times)
+    code_width = max(len(item['code']) for item in items)
+    col_width = max(day_width, code_width)
+
+    print('Time'.ljust(time_width), end=' | ')
+    print(' | '.join(day.ljust(col_width) for day in days))
+    
+    print('-' * time_width, end=' | ')
+    print(' | '.join('-' * col_width for _ in days))
+
+    for time in times:
+        print(time.ljust(time_width), end=' | ')
+        row = []
+        for day in days:
+            code = schedule_map.get((day, time), '')
+            row.append(code.ljust(col_width))
+        print(' | '.join(row))
+
 def calc_time(i, id):
     minutes_per_slot = 15
     slots_per_hour = 60 // minutes_per_slot  # 4 slots per hour
@@ -134,6 +169,9 @@ def calc_time(i, id):
     print("[+] %s : %s : %s" % (days[day], time, i))
     return [days[day], time]
 
+############################################
+########### Reservation handlers ###########
+############################################
 def reservar(item):
     r = s.get(url)
     if "tanca sessió" not in r.text:
@@ -186,6 +224,9 @@ def loop_reserva(item):
         if completed == False:
             time.sleep(5)
 
+############################################
+#### Multithreaded reservation handlers ####
+############################################
 def holy_func(preferences):
     def reserve_item(preference):
         reservar(preference)
@@ -212,6 +253,106 @@ def holy_func_looping(preferences):
     for t in threads:
         t.join()
 
+############################################
+########### User input handlers ############
+############################################
+def display_options_table(options):
+    """Display options in a formatted table"""
+    if not options:
+        print("No options available")
+        return
+
+    cleaned_options = []
+    for code, name in options:
+        # Basic cleanup
+        clean_name = name.replace('\n', ' ').strip()
+        
+        # Only split if the name contains multiple distinct activities
+        if ' / ' in clean_name or ' - ' in clean_name:
+            clean_name = clean_name.split(' / ')[0].split(' - ')[0].strip()
+        # Don't split multi-word activity names
+        elif any(word in clean_name.upper() for word in ['CÀRDIO', 'FITNES', 'GAP', 'IOGA']):
+            clean_name = ' '.join(clean_name.split())  # Just normalize spaces
+            
+        cleaned_options.append((code, clean_name))
+
+    # Format table (rest remains the same)
+    max_code_len = max(len(opt[0]) for opt in cleaned_options)
+    max_name_len = max(len(opt[1]) for opt in cleaned_options)
+    
+    header = f"| {'Code'.ljust(max_code_len)} | {'Name'.ljust(max_name_len)} |"
+    separator = f"|{'-' * (max_code_len + 2)}|{'-' * (max_name_len + 2)}|"
+    
+    print(separator)
+    print(header)
+    print(separator)
+    for code, name in cleaned_options:
+        print(f"| {code.ljust(max_code_len)} | {name.ljust(max_name_len)} |")
+    print(separator)
+
+def get_url():
+    global campus, tipoact, codacti, url, s
+
+    # Get campus selection
+    print(r"""
+Campus:
+    A: Alcoi
+    G: Gandía
+    V: Vera
+    """)
+    campus = input("\nIntroduzca el campus (A, G, V): ").upper()
+    while campus not in ['A', 'G', 'V']:
+        print("Campus inválido. Debe ser A, G, o V")
+        campus = input("Introduzca el campus (A, G, V): ").upper()
+
+    # Get tipoact options
+    base_url = f"https://intranet.upv.es/pls/soalu/sic_depact.HSemActividades?p_campus={campus}&p_vista=intranet&p_idioma=c&p_solo_matricula_sn=&p_anc=filtro_campus"
+    r = s.get(base_url)
+    soup = BeautifulSoup(r.text, 'html.parser')
+    
+    # Extract tipoact options
+    tipoact_select = soup.find('select', {'name': 'tipoact'})
+    if tipoact_select:
+        tipoact_options = []
+        for opt in tipoact_select.find_all('option'):
+            value = opt['value']
+            # Take only the first line and clean whitespace
+            name = opt.text.split('\n')[0].strip()
+            tipoact_options.append((value, name))
+        
+        print("\nTipos de actividad disponibles:")
+        display_options_table(tipoact_options)
+        
+        tipoact = input("\nSeleccione el código de actividad: ")
+        while tipoact not in [opt[0] for opt in tipoact_options]:
+            print("Código inválido")
+            tipoact = input("\nSeleccione el código de actividad: ")
+
+    # Get codacti options
+    activities_url = f"https://intranet.upv.es/pls/soalu/sic_depact.HSemActividades?p_campus={campus}&p_tipoact={tipoact}&p_vista=intranet&p_idioma=c&p_solo_matricula_sn=&p_anc=filtro_programa"
+    r = s.get(activities_url)
+    soup = BeautifulSoup(r.text, 'html.parser')
+    
+    # Extract activity options
+    acti_select = soup.find('select', {'name': 'acti'})
+    if acti_select:
+        acti_options = []
+        for opt in acti_select.find_all('option'):
+            value = opt['value']
+            # Take only the first line and clean whitespace
+            name = opt.text.split('\n')[0].strip()
+            acti_options.append((value, name))
+        
+        print("\nActividades disponibles:")
+        display_options_table(acti_options)
+        
+        codacti = input("\nSeleccione el código de la actividad: ")
+        while codacti not in [opt[0] for opt in acti_options]:
+            print("Código inválido")
+            codacti = input("\nSeleccione el código de la actividad: ")
+    
+    # Update URL
+    url = f"https://intranet.upv.es/pls/soalu/sic_depact.HSemActividades?p_campus={campus}&p_tipoact={tipoact}&p_codacti={codacti}&p_vista=intranet&p_idioma=c&p_solo_matricula_sn=&p_anc=filtro_actividad"
 
 def check_args(args):
     return all(v is None for v in vars(args).values())
@@ -226,6 +367,7 @@ Opciones:
     l : Mostrar lista de la actividad (list)
     b: Brute force hasta conseguir las actividad (brute / bruteforce)
     r: reservar simple (reserve)
+    c: elegir actividad (choose)
     u: cambiar url (url)
     e: salir (exit)
               """)
@@ -234,7 +376,7 @@ def get_user_choice():
     while True:
         options()
         choice = input("Introduzca tu opción: ").lower()
-        if choice in ['l', 'b', 'r', 'e', 'exit', 'brute', 'bruteforce', 'reserve', 'list']:
+        if choice in ['l', 'b', 'r', 'e', 'u', 'c', 'exit', 'brute', 'bruteforce', 'reserve', 'list', 'url', 'choose']:
             return choice
         print("Opción no válida, inténtalo de nuevo.")
 
@@ -270,8 +412,12 @@ def handle_options():
                 print("No preferences specified")
         elif choice in ['u', 'url']:
             set_url()
+        elif choice in ['c', 'change']:
+            get_url()
 
-
+############################################
+########### Main execution logic ###########
+############################################
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-u','--user', help='Username')
@@ -296,11 +442,25 @@ if __name__ == "__main__":
         user = input("Introduzca el usuario: ")
         passwd = getpass("Introduzca la contraseña: ")
 
+        print("\nIniciando sesión...")
         login(user, passwd)
 
-        url = input("\nIntroduzca la url de la actividad deseada: ")
+        print("\nSesión iniciada con éxito.")
 
-        items = get_time(get_schedule())
+        print("""
+¿Cómo desea seleccionar la actividad?
+1. Seleccionar por menú (S)
+2. Introducir URL directamente (U)
+        """)
+        ask = input("Introduzca su elección (S/U): ").upper()
+        while ask not in ['S', 'U']:
+            print("Opción inválida. Inténtalo de nuevo.")
+            ask = input("Introduzca su elección (S/U): ").upper()
+
+        if ask == 'S':
+            get_url()
+        else:
+            set_url()
 
         handle_options()
 
