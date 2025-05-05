@@ -415,6 +415,24 @@ def handle_options():
         elif choice in ['c', 'change']:
             get_url()
 
+def main():
+    print("""
+¿Cómo desea seleccionar la actividad?
+1. Seleccionar por menú (S)
+2. Introducir URL directamente (U)
+        """)
+    ask = input("Introduzca su elección (S/U): ").upper()
+    while ask not in ['S', 'U']:
+        print("Opción inválida. Inténtalo de nuevo.")
+        ask = input("Introduzca su elección (S/U): ").upper()
+
+    if ask == 'S':
+        get_url()
+    else:
+        set_url()
+
+    handle_options()
+
 ############################################
 ########### Main execution logic ###########
 ############################################
@@ -447,22 +465,7 @@ if __name__ == "__main__":
 
         print("\nSesión iniciada con éxito.")
 
-        print("""
-¿Cómo desea seleccionar la actividad?
-1. Seleccionar por menú (S)
-2. Introducir URL directamente (U)
-        """)
-        ask = input("Introduzca su elección (S/U): ").upper()
-        while ask not in ['S', 'U']:
-            print("Opción inválida. Inténtalo de nuevo.")
-            ask = input("Introduzca su elección (S/U): ").upper()
-
-        if ask == 'S':
-            get_url()
-        else:
-            set_url()
-
-        handle_options()
+        
 
     else:
         if(user == "" or passwd == ""):
@@ -470,6 +473,11 @@ if __name__ == "__main__":
             sys.exit(1)
 
         login(user, passwd)
+
+        print("\nSesión iniciada con éxito.")
+
+        if (list is None and pref is None and loop is None):
+            main()
 
         if (list == "Y" ):
             print_schedule(get_time(get_schedule()))
